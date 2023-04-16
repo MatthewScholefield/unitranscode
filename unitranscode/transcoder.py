@@ -177,16 +177,13 @@ class Transcoder:
         op = op or self.op()
         assert force_no_transcode, 'Transcoding not supported yet for chop'
         assert (
-            pos_start_s is None
-        ), 'Custom start position not supported yet for chop'
-        assert (
-            pos_end_s is not None
-        ), 'Undefined end position not supported yet for chop'
+            pos_start_s is None or pos_end_s is not None
+        ), 'Must specify either start or end position to chop to'
         self.ffmpeg(
             *['-i', in_file],
             *['-c', 'copy'],
-            *['-ss', '0'],
-            *['-t', str(pos_end_s)],
+            *['-ss', str(pos_start_s)] * (pos_start_s is not None),
+            *['-to', str(pos_end_s)] * (pos_end_s is not None),
             out_file,
             duration_s=self.info(in_file).duration_s if on_progress else None,
             on_progress=on_progress,
