@@ -14,7 +14,7 @@ from subprocess import PIPE, Popen
 from tempfile import NamedTemporaryFile
 from threading import Lock
 from time import sleep
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from loguru import logger
 
@@ -545,6 +545,30 @@ class Transcoder:
                 op=op,
             )
         return out_file
+
+    def edit(
+        self,
+        in_file: str,
+        cuts: List[Tuple[float, float]],
+        output_file: str,
+        on_progress: ProgressHandler = None,
+        op: FfmpegOperation = None,
+    ) -> str:
+        op = op or self.op()
+        filter_str = '+'.join(
+            f'between(t,{start},{end})' for start, end in cuts
+        )
+
+        self.ffmpeg(
+            *('-i', in_file),
+            *('-vf', f"select='{filter_str}',setpts=N/FRAME_RATE/TB"),
+            *('-af', f"aselect='{filter_str}',asetpts=N/SR/TB"),
+            output_file,
+            duration_s=self.info(in_file).duration_s if on_progress else None,
+            on_progress=on_progress,
+            op=op,
+        )
+        return output_file
 
     def split(
         self,

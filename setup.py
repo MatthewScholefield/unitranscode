@@ -2,14 +2,13 @@ from setuptools import setup
 
 setup(
     name='unitranscode',
-    version='0.1.0',
+    version='0.2.0',
     description='Universal transcoding library',
     url='https://github.com/MatthewScholefield/unitranscode',
     author='Matthew D. Scholefield',
     author_email='matthew331199@gmail.com',
     classifiers=[
         'Development Status :: 3 - Alpha',
-
         'Intended Audience :: Developers',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.8',
@@ -18,7 +17,6 @@ setup(
     ],
     keywords='unitranscode',
     packages=['unitranscode'],
-    install_requires=[
-        'loguru'
-    ],
+    install_requires=['loguru'],
+    extra_requires={'dev': ['pytest']},
 )
