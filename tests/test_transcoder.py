@@ -1,5 +1,6 @@
 from os.path import isfile
 from pathlib import Path
+import pytest
 
 
 from unitranscode.transcoder import Transcoder
@@ -17,7 +18,20 @@ def test_edit(example_20s_wav_file: Path, temp_folder: Path):
 
     assert isfile(out_file)
 
-    in_file_duration = transcoder.info(in_file).duration_s
     out_file_duration = transcoder.info(out_file).duration_s
     expected_duration = sum([end - start for start, end in cuts])
-    assert abs(expected_duration - out_file_duration) < 0.1 * in_file_duration
+    assert out_file_duration == pytest.approx(expected_duration, 0.1)
+
+
+def test_extract_cuts(example_20s_wav_file: Path, temp_folder: Path):
+    in_file = example_20s_wav_file
+    transcoder = Transcoder()
+
+    cuts = [(0.0, 1.0), (3.0, 4.5), (7.0, 10.0)]
+    out_files = transcoder.extract_cuts(
+        in_file, cuts, str(temp_folder.joinpath('out-%d.wav'))
+    )
+
+    assert transcoder.info(out_files[0]).duration_s == pytest.approx(1.0)
+    assert transcoder.info(out_files[1]).duration_s == pytest.approx(1.5)
+    assert transcoder.info(out_files[2]).duration_s == pytest.approx(3.0)

@@ -1,6 +1,7 @@
 import atexit
 import json
 import os
+from pathlib import Path
 import re
 import shutil
 import threading
@@ -41,13 +42,11 @@ class FfmpegOperation:
         self.cmd: Optional[list] = None
         self._proc: Optional[Popen] = None
         self.is_paused = False
+        self.cancelled = False
         self.pause_lock = Lock()
         self.stdout_chunks = []
         self.stderr_chunks = []
         self.future: Optional[Future] = None
-
-    def set_proc(self, value) -> Popen:
-        ...
 
     @property
     def pid(self):
@@ -86,6 +85,12 @@ class FfmpegOperation:
             self.is_paused = False
             if self._proc:
                 self.resume_pid(self.proc.pid)
+
+    def cancel(self):
+        with self.pause_lock:
+            self.cancelled = True
+            if self._proc:
+                self._proc.kill()
 
     @cached_property
     def input_files_info(self) -> List[EncodingInfo]:
@@ -158,7 +163,7 @@ class Transcoder:
         op.stdout_chunks.append(stdout)
         op.stderr_chunks.append(stderr)
 
-        if proc.returncode == -9 and self._shutting_down:
+        if proc.returncode == -9 and (self._shutting_down or op.cancelled):
             raise CancelledError('Ffmpeg operation cancelled')
         if proc.returncode != 0:
             raise op.exec_error(proc.returncode)
@@ -392,7 +397,10 @@ class Transcoder:
         video_indices = (
             [*range(len(infos))] if video_index is None else [video_index]
         )
-        duration_s = max(i.duration_s for i in infos)
+        try:
+            duration_s = max(i.duration_s for i in infos)
+        except UnitranscodeFormatError:
+            duration_s = None
         video_streams = [
             (i, infos[i].video_stream)
             for i in video_indices
@@ -569,6 +577,78 @@ class Transcoder:
             op=op,
         )
         return output_file
+
+    @staticmethod
+    def _format_duration(dur: float) -> str:
+        mins, secs = divmod(dur, 60.0)
+        hours, mins = divmod(dur, 60.0)
+        return f'{int(hours):02}:{int(mins):02}:{secs:.03}'
+
+    @staticmethod
+    def _chunks(arr, n):
+        for i in range(0, len(arr), n):
+            yield arr[i : i + n]
+
+    def extract_cuts(
+        self,
+        in_file: str,
+        cuts: List[Tuple[float, float]],
+        out_file_fmt='{in_base}-%d.{in_ext}',
+        on_progress: ProgressHandler = None,
+        batch_size=8,
+        op: FfmpegOperation = None,
+    ):
+        total = 0
+        out_files = []
+        for cuts_batch in self._chunks(cuts, batch_size):
+            out_files.extend(
+                self._extract_cuts_direct(
+                    in_file=in_file,
+                    cuts=cuts_batch,
+                    out_file_fmt=out_file_fmt,
+                    n_offset=total,
+                    on_progress=on_progress,
+                    op=op,
+                )
+            )
+            total += len(cuts_batch)
+        return out_files
+
+    def _extract_cuts_direct(
+        self,
+        in_file: str,
+        cuts: List[Tuple[float, float]],
+        out_file_fmt='{in_base}-%d.{in_ext}',
+        n_offset=0,
+        on_progress: ProgressHandler = None,
+        op: FfmpegOperation = None,
+    ):
+        op = op or self.op()
+        op.input_files = [in_file]
+        in_base, in_ext = splitext(in_file)
+        in_ext = in_ext.lstrip('.')
+        out_file_fmt = out_file_fmt.format(in_base=in_base, in_ext=in_ext)
+        args = [
+            *('-i', in_file),
+        ]
+        out_files = []
+        for clip_num, (clip_start, clip_end) in enumerate(cuts, n_offset):
+            out_file = out_file_fmt.replace('%d', str(clip_num))
+            args += [
+                *('-ss', str(clip_start)),
+                *('-to', str(clip_end)),
+                *('-reset_timestamps', '1'),
+                out_file,
+            ]
+            out_files += [out_file]
+        op.output_files = out_files
+        self.ffmpeg(
+            *args,
+            duration_s=self.info(in_file).duration_s,
+            on_progress=on_progress,
+            op=op,
+        )
+        return out_files
 
     def split(
         self,
