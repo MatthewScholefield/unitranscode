@@ -1,7 +1,7 @@
 from os.path import isfile
 from pathlib import Path
-import pytest
 
+import pytest
 
 from unitranscode.transcoder import Transcoder
 

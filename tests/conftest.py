@@ -1,6 +1,7 @@
-from pathlib import Path
 import tempfile
 import wave
+
+from pathlib import Path
 
 import pytest
 
