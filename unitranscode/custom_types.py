@@ -33,11 +33,12 @@ class UnitranscodeExecError(UnitranscodeFormatError):
 
 class EncodingInfo(dict):
     @property
-    def sample_rate_0(self):
-        if len(self['streams']) != 0 and 'sample_rate' in self['streams'][0]:
-            return self['streams'][0]['sample_rate']
-        else:
-            return '22050'
+    def sample_rate_maybe(self):
+        return (
+            self.audio_streams[0].get('sample_rate')
+            if self.audio_streams
+            else None
+        )
 
     @property
     def video_streams(self):

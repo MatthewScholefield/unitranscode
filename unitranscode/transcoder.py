@@ -266,6 +266,11 @@ class Transcoder:
             k: '0.0' if v in ['inf', '-inf'] else v
             for k, v in norm_info.items()
         }
+        in_file_info = self.info(in_file)
+        if not in_file_info.sample_rate_maybe and in_file_info.audio_streams:
+            logger.error(
+                'Unknown sample rate for audio file: {}', in_file_info
+            )
         self.ffmpeg(
             *['-i', in_file],
             *[
@@ -288,9 +293,12 @@ class Transcoder:
             *['-map', '[norm0]'],
             *['-c:a:0', 'pcm_s16le'],
             *['-c:s', 'copy'],
-            *['-ar', f'{self.info(in_file).sample_rate_0}'],
+            *(
+                ['-ar', f'{in_file_info.sample_rate_maybe}']
+                * bool(in_file_info.sample_rate_maybe)
+            ),
             out_file,
-            duration_s=self.info(in_file).duration_s if on_progress else None,
+            duration_s=in_file_info.duration_s if on_progress else None,
             on_progress=on_progress,
             op=op,
         )
