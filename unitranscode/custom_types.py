@@ -42,7 +42,15 @@ class EncodingInfo(dict):
 
     @property
     def video_streams(self):
-        return [i for i in self['streams'] if i['codec_type'] == 'video']
+        video_streams = [
+            i for i in self['streams'] if i['codec_type'] == 'video'
+        ]
+        # Remove strange 'video' format types like MJPEG
+        if len(video_streams) > 1:
+            video_streams = [
+                i for i in video_streams if i.get('avg_frame_rate') != '0/0'
+            ] or video_streams
+        return video_streams
 
     @property
     def audio_streams(self):
