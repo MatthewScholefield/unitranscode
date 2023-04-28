@@ -288,6 +288,7 @@ class Transcoder:
             *['-map', '[norm0]'],
             *['-c:a:0', 'pcm_s16le'],
             *['-c:s', 'copy'],
+            *['-ar', f'{self.info(in_file).sample_rate_0}'],
             out_file,
             duration_s=self.info(in_file).duration_s if on_progress else None,
             on_progress=on_progress,
