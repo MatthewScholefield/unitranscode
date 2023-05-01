@@ -698,7 +698,7 @@ class Transcoder:
             on_progress=on_progress,
             op=op,
         )
-        pre, suff = out_file_fmt.split('%d')
+        pre, suff = out_file_fmt.encode().split(b'%d')
         out_filenames_raw = sorted(
             re.findall(
                 rb"^\s*\[[^]]*]\s*Opening '(.*)' for writing\s*$",
