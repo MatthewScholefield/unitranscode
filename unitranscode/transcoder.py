@@ -96,20 +96,23 @@ class FfmpegOperation:
         return [self.transcoder.info(i) for i in self.input_files]
 
     @property
-    def stdout_str(self):
-        return b''.join(self.stdout_chunks).decode()
+    def stdout_bytes(self):
+        return b''.join(self.stdout_chunks)
 
     @property
-    def stderr_str(self):
-        return b''.join(self.stderr_chunks).decode()
+    def stderr_bytes(self):
+        return b''.join(self.stderr_chunks)
 
     def exec_error(self, return_code: int, info=''):
         assert self.cmd
         full_cmd = ' '.join("'{}'".format(i) for i in self.cmd)
+        debug_cmd_output = self.stdout_bytes.decode(
+            errors='ignore'
+        ) + self.stderr_bytes.decode(errors='ignore')
         return UnitranscodeExecError(
             (
                 f'Failed to run ffmpeg ({return_code}): {info}'
-                f'{self.stdout_str}{self.stderr_str}\n'
+                f'{debug_cmd_output}\n'
                 f'Full command: {full_cmd}',
                 self.cmd,
             )
@@ -245,12 +248,12 @@ class Transcoder:
             op=op,
             on_progress=on_progress,
         )
-        bracket_blobs = re.findall(r'{[^{}]*}', op.stderr_str)
+        bracket_blobs: List[bytes] = re.findall(rb'{[^{}]*}', op.stderr_bytes)
         if not bracket_blobs:
-            bracket_blobs = re.findall(r'{[^{}]*}', op.stdout_str)
+            bracket_blobs = re.findall(rb'{[^{}]*}', op.stdout_bytes)
             if not bracket_blobs:
                 raise op.exec_error(0, 'Unexpected ouput')
-        return json.loads(bracket_blobs[-1])
+        return json.loads(bracket_blobs[-1].decode(errors='ignore'))
 
     def normalize(
         self,
@@ -696,18 +699,20 @@ class Transcoder:
             op=op,
         )
         pre, suff = out_file_fmt.split('%d')
-        op.output_files = sorted(
+        out_filenames_raw = sorted(
             re.findall(
-                r"^\s*\[[^]]*]\s*Opening '(.*)' for writing\s*$",
+                rb"^\s*\[[^]]*]\s*Opening '(.*)' for writing\s*$",
                 (
-                    op.stderr_str.replace('\r', '\n')
-                    + '\n'
-                    + op.stdout_str.replace('\r', '\n')
+                    op.stderr_bytes.replace(b'\r', b'\n')
+                    + b'\n'
+                    + op.stdout_bytes.replace(b'\r', b'\n')
                 ),
                 re.MULTILINE,
             ),
             key=lambda x: int(remove_prefix_suffix(x, pre, suff)),
         )
+        # We assume filenames don't have any non-utf8 characters
+        op.output_files = [i.decode() for i in out_filenames_raw]
         return op.output_files
 
     def chunk(
