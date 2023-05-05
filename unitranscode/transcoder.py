@@ -77,13 +77,23 @@ class FfmpegOperation:
         with self.pause_lock if _with_lock else nullcontext():
             self.is_paused = True
             if self._proc:
-                self.pause_pid(self.proc.pid)
+                try:
+                    self.pause_pid(self.proc.pid)
+                except ProcessLookupError:
+                    assert (
+                        self._proc.poll() is not None
+                    ), 'Error: Process not terminated, but failed to find PID'
 
     def resume(self, _with_lock=True):
         with self.pause_lock if _with_lock else nullcontext():
             self.is_paused = False
             if self._proc:
-                self.resume_pid(self.proc.pid)
+                try:
+                    self.resume_pid(self.proc.pid)
+                except ProcessLookupError:
+                    assert (
+                        self._proc.poll() is not None
+                    ), 'Error: Process not terminated, but failed to find PID'
 
     def cancel(self):
         with self.pause_lock:
