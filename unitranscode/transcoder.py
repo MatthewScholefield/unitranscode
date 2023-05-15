@@ -498,7 +498,7 @@ class Transcoder:
             )
 
         if audio_codec:
-            if not did_mix and audio_infos[0]['codec_name'] == audio_codec:
+            if not did_mix and audio_infos[0].get('codec_name') == audio_codec:
                 args.extend(['-c:a', 'copy'])
             else:
                 args.extend(['-c:a', audio_codec])
@@ -513,7 +513,8 @@ class Transcoder:
                 incompatible = True
             if channels is not None and audio_info['channels'] != channels:
                 incompatible = True
-            input_audio_is_wav = audio_info['codec_name'].startswith('pcm_')
+            codec_name = audio_info.get('codec_name', '')
+            input_audio_is_wav = codec_name.startswith('pcm_')
             output_is_wav = output_ext in ['.wav', '.wave']
             # ffmpeg will incorrectly encode audio to non-container formats
             if not output_has_video:
