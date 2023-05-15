@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='unitranscode',
-    version='0.3.3',
+    version='0.4.0',
     description='Universal transcoding library',
     url='https://github.com/MatthewScholefield/unitranscode',
     author='Matthew D. Scholefield',
