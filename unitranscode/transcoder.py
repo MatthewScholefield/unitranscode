@@ -584,16 +584,41 @@ class Transcoder:
         op: FfmpegOperation = None,
     ) -> str:
         op = op or self.op()
-        filter_str = '+'.join(
-            f'between(t,{start},{end})' for start, end in cuts
+        info = self.info(in_file)
+        has_video = bool(info.video_stream_maybe)
+        has_audio = bool(info.audio_stream_maybe)
+        filter_cmds = []
+        stream_names = []
+        for i, (lt, rt) in enumerate(cuts):
+            cmd = ''
+            name = ''
+            if has_video:
+                cmd += f'[0:v]trim={lt}:{rt},setpts=PTS-STARTPTS[v{i}];'
+                name += f'[v{i}]'
+            if has_audio:
+                cmd += f'[0:a]atrim={lt}:{rt},asetpts=PTS-STARTPTS[a{i}];'
+                name += f'[a{i}]'
+            filter_cmds.append(cmd)
+            stream_names.append(name)
+        video_output = '[v]' * has_video
+        audio_output = '[a]' * has_audio
+        complex_filter = (
+            ''.join(filter_cmds)
+            + ''.join(stream_names)
+            + f'concat=n={str(len(stream_names))}'
+            + f':v={[0, 1][has_video]}:a={[0, 1][has_audio]}'
+            + video_output
+            + audio_output
         )
 
         self.ffmpeg(
             *('-i', in_file),
-            *('-vf', f"select='{filter_str}',setpts=N/FRAME_RATE/TB"),
-            *('-af', f"aselect='{filter_str}',asetpts=N/SR/TB"),
+            *('-filter_complex', complex_filter),
+            *('-map', video_output) * has_video,
+            *('-map', audio_output) * has_audio,
+            '-shortest',
             output_file,
-            duration_s=self.info(in_file).duration_s if on_progress else None,
+            duration_s=sum(b - a for a, b in cuts),
             on_progress=on_progress,
             op=op,
         )
