@@ -35,3 +35,16 @@ def test_extract_cuts(example_20s_wav_file: Path, temp_folder: Path):
     assert transcoder.info(out_files[0]).duration_s == pytest.approx(1.0)
     assert transcoder.info(out_files[1]).duration_s == pytest.approx(1.5)
     assert transcoder.info(out_files[2]).duration_s == pytest.approx(3.0)
+
+
+def test_transcode_wav(example_20s_wav_file: Path, temp_folder: Path):
+    transcoder = Transcoder()
+    out_file = transcoder.transcode(
+        str(example_20s_wav_file),
+        str(temp_folder.joinpath('output.wav')),
+        audio_codec='pcm_s16le',
+    )
+    assert (
+        transcoder.info(example_20s_wav_file).duration_s
+        == transcoder.info(out_file).duration_s
+    )

@@ -385,12 +385,13 @@ class Transcoder:
         sample_rate: Optional[int] = None,
         audio_index: int = None,
         video_index: int = None,
+        audio_codec: str = None,
         mix_down=True,
         extra_args: list = None,
         on_progress: ProgressHandler = None,
         audiogram_op: Union[AudiogramOp, dict] = None,
         op: FfmpegOperation = None,
-    ):
+    ) -> str:
         op = op or self.op()
         op.input_files = [input] if isinstance(input, str) else list(input)
         infos = op.input_files_info
@@ -486,16 +487,23 @@ class Transcoder:
                 ]
             )
 
-        if not did_mix:
-            audio_infos = [
-                infos[i].audio_stream
-                for i in audio_indices
-                if infos[i].audio_stream_maybe
-            ]
-            if not audio_infos:
-                raise UnitranscodeFormatError(
-                    'Input does not have any audio channels!'
-                )
+        audio_infos = [
+            infos[i].audio_stream
+            for i in audio_indices
+            if infos[i].audio_stream_maybe
+        ]
+        if not audio_infos:
+            raise UnitranscodeFormatError(
+                'Input does not have any audio channels!'
+            )
+
+        if audio_codec:
+            if not did_mix and audio_infos[0]['codec_name'] == audio_codec:
+                args.extend(['-c:a', 'copy'])
+            else:
+                args.extend(['-c:a', audio_codec])
+
+        if not did_mix and not audio_codec:
             audio_info = audio_infos[0]
             incompatible = False
             if (
